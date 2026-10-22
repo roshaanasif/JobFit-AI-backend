@@ -6,6 +6,7 @@ const app = express();
 const cookie = require("cookie-parser");
 
 const authRouter = require("./routes/auth.routes");
+const AiRouter = require("./routes/report.routes");
 
 app.use(express.json());
 
@@ -19,5 +20,6 @@ app.use(
 );
 
 app.use("/api/auth", authRouter);
+app.use("/api/Ai", AiRouter);
 
 module.exports = app;

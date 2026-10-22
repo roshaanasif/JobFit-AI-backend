@@ -7,7 +7,7 @@ const ai =new GoogleGenAI({
 })
 
 
-const checkingAi=async({resume,jobdescription,description})=>{
+const generateResumeReport=async({resume,jobdescription,description})=>{
 
 
 const prompt=`
@@ -164,4 +164,4 @@ Analyze the resume against the job description and return the result according t
 }
 
 
-module.exports=checkingAi
+module.exports=generateResumeReport

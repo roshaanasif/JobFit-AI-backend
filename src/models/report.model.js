@@ -1,29 +1,5 @@
 const mongoose=require('mongoose')
 
-
-const reportSchema=new mongoose.Schema({
-
-    jobDescription:{
-        type:String,
-        required:[true,"Job description Is Required"]
-    },
-    description:{
-        type:String,
-    },
-    resume:{
-        type:String,
-        required:[true,"Resume Is Required For Matching"]
-    },
-    matchScore:{
-        type:Number,
-        min:0,
-        max:100
-    },
-    skillGap:[skillGapSchema],
-    preparationPlan:[preparationPlanSchema],
-    technicalQuestion:[technicalQuestionSchema]
-})
-
 const skillGapSchema=new mongoose.Schema({
     skill:{
         type:String,
@@ -73,6 +49,34 @@ const preparationPlanSchema=new mongoose.Schema({
 },{
     _id:false
 })
+const reportSchema=new mongoose.Schema({
+
+    jobDescription:{
+        type:String,
+        required:[true,"Job description Is Required"]
+    },
+    description:{
+        type:String,
+    },
+    resume:{
+        type:String,
+        required:[true,"Resume Is Required For Matching"]
+    },
+    matchScore:{
+        type:Number,
+        min:0,
+        max:100
+    },
+    skillGap:[skillGapSchema],
+    preparationPlan:[preparationPlanSchema],
+    technicalQuestions:[technicalQuestionSchema],
+    user:{
+        type:mongoose.Schema.Types.ObjectId,
+        ref:"user"
+    }
+})
+
+
 
 
 const reportModel=mongoose.model("report",reportSchema)

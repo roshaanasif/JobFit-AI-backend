@@ -50,7 +50,12 @@ const preparationPlanSchema=new mongoose.Schema({
     _id:false
 })
 const reportSchema=new mongoose.Schema({
-
+    jobRole:{
+        type:String,
+    },
+    company:{
+         type:String,
+    },
     jobDescription:{
         type:String,
         required:[true,"Job description Is Required"]
@@ -80,6 +85,7 @@ const reportSchema=new mongoose.Schema({
 
 
 const reportModel=mongoose.model("report",reportSchema)
+
 
 
 module.exports=reportModel

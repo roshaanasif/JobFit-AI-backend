@@ -5,7 +5,9 @@ const jwt=require("jsonwebtoken")
 
 const authmiddleware=async(req,res,next)=>{
 
-    const token =req.cookies.Jwt_Token || req.headers.authorization?.split(" ")[1]
+    try{
+        
+        const token =req.cookies.Jwt_Token || req.headers.authorization?.split(" ")[1]
 
      if (!token){
         return res.status(401).json({
@@ -35,10 +37,17 @@ const authmiddleware=async(req,res,next)=>{
 
     req.user=user 
 
+    console.log(user)
     req.token=token 
   
 
     next()
+    
+    } catch (error) {
+    return res.status(401).json({
+      message: "Unauthorized access, token is invalid or expired",
+    });
+  }
 
 }
 

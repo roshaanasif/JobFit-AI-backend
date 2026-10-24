@@ -4,6 +4,17 @@ const z =require("zod")
 const reportJsonSchema = {
   type: "object",
   properties: {
+    jobRole:{
+        type:"string",
+        description:
+              "The specific job position or role the candidate is applying for. For example: Software Engineer, Backend Developer, Frontend Developer, UI/UX Designer, or Data Analyst."
+
+    },
+    company:{
+         type:"string",
+         description: "The name of the company or organization where the candidate is applying for the specified job role. For example: Google, Microsoft, Systems Limited, or a specific organization name."
+
+    },
     matchScore: {
       type: "number",
       description:
@@ -99,6 +110,8 @@ const reportJsonSchema = {
   },
 
   required: [
+    "jobRole",
+    "company",
     "matchScore",
     "skillGap",
     "technicalQuestions",

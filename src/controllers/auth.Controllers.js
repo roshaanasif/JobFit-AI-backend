@@ -87,7 +87,14 @@ exports.userLoginController= async(req,res)=>{
 
 
     res.cookie("Jwt_Token",token)
-    res.cookie("refreshToken",refreshToken)
+    
+    res.cookie("refreshToken",refreshToken,{
+      httpOnly: true,
+      secure: process.env.NODE_ENV === "production",
+      sameSite: "lax",
+      maxAge: 3 * 24 * 60 * 60 * 1000,
+    })
+
 
 
     res.status(200).json({
@@ -134,12 +141,11 @@ exports.getMeController=async(req,res)=>{
 }
 
 exports.refreshTokenController=async(req,res)=>{
-    const user=req.user;
-
-    const refreshToken = req.cookies.refreshToken || req.headers.authorization?.split(" ")[1]
+  
+    const refreshToken = req.cookies.refreshToken 
 
     if(!refreshToken){
-        res.status(401).json({
+        return res.status(401).json({
             message:"refresh Token Is Missing"
         })
     }
@@ -147,29 +153,36 @@ exports.refreshTokenController=async(req,res)=>{
     const decoded = jwt.verify(refreshToken, config.JWT_REFRESH_SECRET)
 
     if(!decoded){
-        res.status(401).json({
+        return res.status(401).json({
             message:"Refresh Token Is Invalid"
         })
     }
 
-    const token=Jwt.sign(
-        {userId:user._id},
+    const user = await userModel.findById(decoded.userId);
+
+    const token=jwt.sign(
+        {userId:user.userId},
         config.JWT_SECRET,
         {expiresIn:"15m"}
     )
-    const newRefreshToken=Jwt.sign(
-        {userId:user._id},
+    const newRefreshToken=jwt.sign(
+        {userId:user.userId},
         config.JWT_REFRESH_SECRET,
         {expiresIn:"3d"}
     )
 
+
     res.cookie("JWT_SECRET",token)
-    res.cookie("refreshToken",newRefreshToken)
+    res.cookie("refreshToken",newRefreshToken,{
+      httpOnly: true,
+      secure: process.env.NODE_ENV === "production",
+      sameSite: "lax",
+      maxAge: 3 * 24 * 60 * 60 * 1000,
+    })
+
 
     res.status(200).json({
         message:"Token Refreshed Successfully",
-        token,
-        refreshToken:newRefreshToken
     })
 
 }

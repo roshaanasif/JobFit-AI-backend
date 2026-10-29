@@ -12,7 +12,7 @@ exports.generateReport=async(req,res)=>{
     const {description} = req.body;
     
     if(!resume){
-        return res.status(200).json({
+        return res.status(400).json({
             message:"Resume is required for generating report"
         })
     }
@@ -95,80 +95,40 @@ exports.userKpiController=async(req,res)=>{
     
     const user=req.user
   
-   const dashboardStats = await reportModel.aggregate([
-    {
-      $match: {
-        user: user._id
-      }
-    },
-
-    {
-      $group: {
-        _id: null,
-
-        totalAnalyses: {
-          $sum: 1
-        },
-
-        averageMatch: {
-          $avg: "$matchScore"
-        },
-
-        strongMatches: {
-          $sum: {
-            $cond: [
-              { $gt: ["$matchScore", 80] },
-              1,
-              0
-            ]
-          }
-        },
-
-        skillGaps: {
-          $sum: {
-            $size: {
-              $ifNull: ["$skillGap", []]
-            }
-          }
-        }
-      }
-    },
-
-    {
-      $project: {
-        _id: 0,
-
-        totalAnalyses: 1,
-
-        averageMatch: {
-          $round: [
-            {
-              $ifNull: ["$averageMatch", 0]
-            },
-            0
-          ]
-        },
-
-        strongMatches: 1,
-
-        skillGaps: 1
-      }
-    }
-  ]);
+ 
+  const stats=await user.getUserDashboardKpi()
 
 
-  const stats=dashboardStats[0]||
-{
-    totalAnalyses: 0,
-    averageMatch: 0,
-    strongMatches: 0,
-    skillGaps: 0
+  res.status(200).json({
+      message:"User KPI fetched Successfullly",
+      stats
+  })
+
 }
 
-res.status(200).json({
-    message:"User KPI fetched Successfullly",
-    stats
-})
+exports.singleReportController=async(req,res)=>{
+    const {id}=req.params
+
+    const user=req.user
+
+    const report=await reportModel.findById(id)
+
+    if(!report){
+        return res.status(404).json({
+            message:"Report not found"
+        })
+    }
+
+    if(report.user.toString() !== user._id.toString()){
+        return res.status(403).json({
+            message:"You are not authorized to access this report"
+        })
+    }
+
+    res.status(200).json({
+        message:"Report fetched successfully",
+        report
+    })
 
 }
 

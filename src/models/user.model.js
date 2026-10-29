@@ -1,5 +1,6 @@
 const mongoose=require('mongoose');
 const bcrypt=require('bcryptjs')
+const reportModel=require("../models/report.model")
 
 const userSchema=new mongoose.Schema({
     email:{
@@ -41,6 +42,77 @@ userSchema.methods.comparePasswords=async function(password){
     
 }
 
+userSchema.methods.getUserDashboardKpi=async function(){
+
+      const dashboardStats = await reportModel.aggregate([
+    {
+      $match: {
+        user: this._id
+      }
+    },
+
+    {
+      $group: {
+        _id: null,
+
+        totalAnalyses: {
+          $sum: 1
+        },
+
+        averageMatch: {
+          $avg: "$matchScore"
+        },
+
+        strongMatches: {
+          $sum: {
+            $cond: [
+              { $gt: ["$matchScore", 80] },
+              1,
+              0
+            ]
+          }
+        },
+
+        skillGaps: {
+          $sum: {
+            $size: {
+              $ifNull: ["$skillGap", []]
+            }
+          }
+        }
+      }
+    },
+
+    {
+      $project: {
+        _id: 0,
+
+        totalAnalyses: 1,
+
+        averageMatch: {
+          $round: [
+            {
+              $ifNull: ["$averageMatch", 0]
+            },
+            0
+          ]
+        },
+
+        strongMatches: 1,
+
+        skillGaps: 1
+      }
+    }
+  ]);
+
+  return dashboardStats[0]||{
+    totalAnalyses: 0,
+    averageMatch: 0,
+    strongMatches: 0,
+    skillGaps: 0
+}
+
+}
 
 const userModel=mongoose.model("user",userSchema)
 

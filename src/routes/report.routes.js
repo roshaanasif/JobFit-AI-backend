@@ -7,6 +7,7 @@ const upload=require("../middleware/file.middleware")
 
 
 router.post('/',middleware.authmiddleware, upload.fields([{ name: 'resume', maxCount: 1 },{ name: 'jobDescription', maxCount: 1 }]),reportControllers.generateReport)
+router.get('/:id',middleware.authmiddleware,reportControllers.singleReportController)
 router.get('/report-history/:id',middleware.authmiddleware,reportControllers.reportHistoryController)
 
 

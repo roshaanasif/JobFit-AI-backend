@@ -81,7 +81,7 @@ exports.reportHistoryController=async(req,res)=>{
         })
     }
     const isRecent = recent === "true";
-    const gettingReports=await reportModel.find({ user: id }).sort({ createdAt: -1 }).limit(isRecent ? 3 : 0);
+    const gettingReports=await reportModel.find({ user: id }).sort({ createdAt: -1 }).limit(isRecent ? 3 : 0).select("-resume -jobDescription -technicalQuestions -preparationPlan");
 
 
    res.status(200).json({
@@ -132,3 +132,68 @@ exports.singleReportController=async(req,res)=>{
 
 }
 
+exports.reportHistorySearchController=async(req,res)=>{
+    const user=req.user;
+
+    const search = req.body.search.trim();
+    const { filter = "all", page = 1, limit = 10 } = req.query;
+    const allowedFilters = ["all", "strong", "good", "low"];
+
+    if (!allowedFilters.includes(filter)) {
+        return res.status(400).json({
+            message: "Invalid filter value",
+        });
+    }
+
+    const requestedPage = Number(page);
+    const requestedLimit = Number(limit);
+    const currentPage = requestedPage > 0 ? requestedPage : 1; 
+    const pageLimit = requestedLimit > 0
+        ? Math.min(50, requestedLimit)
+        : 10;
+    const skip = (currentPage - 1) * pageLimit;
+    const query = { user: user._id };
+
+    if (search) {
+        const escapedSearch = search.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+        query.$or = [
+            { jobRole: { $regex: escapedSearch, $options: "i" } },
+            { company: { $regex: escapedSearch, $options: "i" } },
+            { "skillGap.skill": { $regex: escapedSearch, $options: "i" } },
+        ];
+    }
+
+    if (filter === "strong") {
+        query.matchScore = { $gte: 85 };
+    } else if (filter === "good") {
+        query.matchScore = { $gte: 75, $lt: 85 };
+    } else if (filter === "low") {
+        query.matchScore = { $lt: 75 };
+    }
+
+    const [totalReports, reports] = await Promise.all([
+        reportModel.countDocuments(query),
+        reportModel
+            .find(query)
+            .sort({ createdAt: -1 })
+            .skip(skip)
+            .limit(pageLimit)
+            .select("-resume -jobDescription -technicalQuestions -preparationPlan")
+            .lean(),
+    ]);
+
+    const totalPages = Math.ceil(totalReports / pageLimit);
+
+    return res.status(200).json({
+        message: "Reports fetched successfully",
+        reports,
+        pagination: {
+            totalPages,
+            totalReports,
+            currentPage,
+            pageLimit,
+            hasNextPage: currentPage < totalPages,
+            hasPrevPage: currentPage > 1 && currentPage <= totalPages,
+        },
+    });
+};

@@ -108,9 +108,6 @@ exports.userLoginController= async(req,res)=>{
     })
 }
 
-// exports.forgetPasswordController=async(req,res)=>{
-
-// }
 exports.userLogoutController=async(req,res)=>{
 
      const token=req.token

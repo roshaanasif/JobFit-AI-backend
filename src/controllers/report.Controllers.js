@@ -62,7 +62,9 @@ exports.generateReport=async(req,res)=>{
 exports.reportHistoryController=async(req,res)=>{
     const user=req.user
     const {id}=req.params;
-    const {recent}=req.query;
+    const {recent , page=1 ,limit=10 }=req.query;
+ 
+
 
     const matchingId=user._id.toString() === id
 
@@ -81,12 +83,38 @@ exports.reportHistoryController=async(req,res)=>{
         })
     }
     const isRecent = recent === "true";
-    const gettingReports=await reportModel.find({ user: id }).sort({ createdAt: -1 }).limit(isRecent ? 3 : 0).select("-resume -jobDescription -technicalQuestions -preparationPlan");
 
+    const requestedPage=Number(page)
+    const requestedLimit=Number(limit)
+    const currentPage = requestedPage > 0 ? requestedPage : 1;
+    const pageLimit = requestedLimit > 0 ? Math.min(20,requestedLimit) : 10 ;
+    const skip = (currentPage - 1) * pageLimit;
+
+
+    const gettingReports=await reportModel
+    .find({user:id})
+    .sort({ createdAt: -1 })
+    .limit(isRecent ? 3 : pageLimit)
+    .skip(isRecent ? 0 : skip )
+    .select("-resume -jobDescription -technicalQuestions -preparationPlan");
+
+    const totalReports=gettingReports.length;
+    const totalPages=Math.ceil(totalReports/requestedLimit)
 
    res.status(200).json({
             message:"reports fetched Successfully",
-            reports:gettingReports
+            reports:gettingReports,
+            ...(!isRecent && {
+            pagination: {
+                totalPages,
+                totalReports,
+                pageLimit,
+                currentPage,
+                hasNextPage:requestedPage<totalPages,
+                hasPrevPage:currentPage>0 && currentPage <= totalPages 
+            }
+        })
+
     })
 
 }

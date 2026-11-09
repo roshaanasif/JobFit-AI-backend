@@ -24,19 +24,8 @@ exports.updateProfileController=async(req,res)=>{
         })
         }
        
-    }else{
-
-        if(user?.public_id){
-            result=await deleteFile(user?.public_id)
-
-            if(!result){
-                return res.status(500).json({
-                message:"Error in deleting Profile Picture"
-            })
-            }
-        }
-
     }
+
 
 
  const updatedProfile=await userModel.findByIdAndUpdate(
@@ -45,7 +34,6 @@ exports.updateProfileController=async(req,res)=>{
        ...(name && { name:name }),
        ...(email && { email: email }),
        ...(profilePicture && {profilePicture: result.secure_url, public_id:result.public_id }),
-       ...(!profilePicture && {profilePicture: null, public_id:null }),
         },
         {
             new: true,

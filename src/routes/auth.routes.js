@@ -15,7 +15,7 @@ router.get("/get-me",middleware.authmiddleware,authControllers.getMeController)
 
 // router.get("/forget-password",authControllers.forgetPasswordController)
 
-router.get("/refresh-token",middleware.authmiddleware,authControllers.refreshTokenController)
+router.get("/refresh-token",authControllers.refreshTokenController)
  
 
 module.exports=router

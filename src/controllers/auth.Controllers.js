@@ -62,7 +62,6 @@ exports.userLoginController= async(req,res)=>{
         })
     }
 
-    console.log("Request password:", password);
 
     const isValid=await user.comparePasswords(password)
 
@@ -110,14 +109,38 @@ exports.userLoginController= async(req,res)=>{
 
 exports.userLogoutController=async(req,res)=>{
 
-     const token=req.token
-     console.log(token)
+     const {token,refreshToken}=req
 
-     res.clearCookie("Jwt_Token");
 
-     await tokenModel.create({
-        token:token
-     })
+    res.clearCookie("Jwt_Token", {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === "production",
+      sameSite: "strict",
+    });
+
+    res.clearCookie("refreshToken", {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === "production",
+      sameSite: "strict",
+    });
+
+    //  await tokenModel.create({
+    //     token:token
+    //  })
+
+    //  await tokenModel.create({
+    //     token:refreshToken
+    //  })
+
+     const tokensToRevoke = [token, refreshToken].filter(Boolean);
+
+    if (tokensToRevoke.length > 0) {
+      await tokenModel.insertMany(
+        tokensToRevoke.map((token) => ({
+          token: token, 
+        }))
+      );
+    }
 
     return res.status(200).json({
             message:"user Logout Successfully"
@@ -138,49 +161,63 @@ exports.getMeController=async(req,res)=>{
 }
 
 exports.refreshTokenController=async(req,res)=>{
-  
-    const refreshToken = req.cookies.refreshToken 
+    const refreshToken = req.cookies?.refreshToken;
 
     if(!refreshToken){
         return res.status(401).json({
-            message:"refresh Token Is Missing"
-        })
+            message:"Refresh token is missing"
+        });
     }
 
-    const decoded = jwt.verify(refreshToken, config.JWT_REFRESH_SECRET)
-
-    if(!decoded){
+    let decoded;
+    try {
+        decoded = jwt.verify(refreshToken, config.JWT_REFRESH_SECRET);
+    } catch (error) {
         return res.status(401).json({
-            message:"Refresh Token Is Invalid"
-        })
+            message:"Refresh token is invalid or expired"
+        });
+    }
+
+    if(!decoded?.userId){
+        return res.status(401).json({
+            message:"Refresh token is invalid"
+        });
     }
 
     const user = await userModel.findById(decoded.userId);
 
-    const token=jwt.sign(
-        {userId:user.userId},
+    if(!user){
+        return res.status(401).json({
+            message:"Refresh token is invalid"
+        });
+    }
+
+    const token = jwt.sign(
+        {userId:user._id},
         config.JWT_SECRET,
         {expiresIn:"15m"}
-    )
-    const newRefreshToken=jwt.sign(
-        {userId:user.userId},
+    );
+    const newRefreshToken = jwt.sign(
+        {userId:user._id},
         config.JWT_REFRESH_SECRET,
         {expiresIn:"3d"}
-    )
+    );
 
+    res.cookie("Jwt_Token", token, {
+        httpOnly: true,
+        secure: process.env.NODE_ENV === "production",
+        sameSite: "lax",
+        maxAge: 15 * 60 * 1000,
+    });
+    res.cookie("refreshToken", newRefreshToken, {
+        httpOnly: true,
+        secure: process.env.NODE_ENV === "production",
+        sameSite: "lax",
+        maxAge: 3 * 24 * 60 * 60 * 1000,
+    });
 
-    res.cookie("JWT_SECRET",token)
-    res.cookie("refreshToken",newRefreshToken,{
-      httpOnly: true,
-      secure: process.env.NODE_ENV === "production",
-      sameSite: "lax",
-      maxAge: 3 * 24 * 60 * 60 * 1000,
-    })
-
-
-    res.status(200).json({
-        message:"Token Refreshed Successfully",
-    })
-
+    return res.status(200).json({
+        message:"Token refreshed successfully",
+        token
+    });
 }
-

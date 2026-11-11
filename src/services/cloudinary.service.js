@@ -24,7 +24,6 @@ const uploadFile=async(buffer)=>{
       );
 
       stream.end(buffer);
-      console.log("result:",stream)
     });
 
     console.log("result:",result)

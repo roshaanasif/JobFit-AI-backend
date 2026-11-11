@@ -8,6 +8,7 @@ const authmiddleware=async(req,res,next)=>{
     try{
         
         const token =req.cookies.Jwt_Token || req.headers.authorization?.split(" ")[1]
+        const refreshToken =req.cookies.refreshToken || req.headers.authorization?.split(" ")[1]
 
      if (!token){
         return res.status(401).json({
@@ -37,8 +38,8 @@ const authmiddleware=async(req,res,next)=>{
 
     req.user=user 
 
-    console.log(user)
     req.token=token 
+    req.refreshToken=refreshToken 
   
 
     next()

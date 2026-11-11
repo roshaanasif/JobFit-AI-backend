@@ -156,8 +156,8 @@ Analyze the resume against the job description and return the result according t
 
     const result = JSON.parse(response.output_text);
 
-    console.log("PARSED RESULT:", result);
-    // console.log(response.output_text)
+    // console.log("PARSED RESULT:", result);
+    // // console.log(response.output_text)
 
     return result
 

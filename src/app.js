@@ -21,6 +21,13 @@ app.use(
   })
 );
 
+app.get("/", (req, res) => {
+  res.status(200).json({
+    success: true,
+    message: "Job Fit AI Backend is running!",
+  });
+});
+
 app.use("/api/auth", authRouter);
 app.use("/api/report", reportRouter);
 app.use("/api/dashboard", dashboardRouter);

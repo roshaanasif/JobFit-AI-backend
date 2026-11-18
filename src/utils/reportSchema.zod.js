@@ -122,5 +122,18 @@ const reportJsonSchema = {
 };
 
 
+const resumeHtmlSchema = {
+  type: "object",
+  properties: {
+    resumeHtml: {
+      type: "string",
+      description:
+        "Complete ATS-friendly resume in valid HTML format, including contact information, professional summary, skills, experience, and education.",
+    },
+  },
+  required: ["resumeHtml"],
+};
 
-module.exports=reportJsonSchema
+
+
+module.exports={reportJsonSchema,resumeHtmlSchema}

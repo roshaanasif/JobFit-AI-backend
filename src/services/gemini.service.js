@@ -1,10 +1,483 @@
 const {GoogleGenAI}=require("@google/genai")
 const config=require('../config/config')
-const reportJsonSchema=require('../utils/reportSchema.zod')
+const puppeteer=require("puppeteer")
+const {reportJsonSchema,resumeHtmlSchema}=require('../utils/reportSchema.zod')
 
 const ai =new GoogleGenAI({
     apiKey:config.GOOGLE_GENAI_API_KEY
 })
+
+
+// const generateResumePdf=async({resumeContent})=>{
+
+//     const browser = await puppeteer.launch();
+//     const page = await browser.newPage();
+
+//     await page.setContent(resumeContent)
+
+//     const pdf = await page.pdf({
+//       format: "A4",
+//       printBackground: true,
+//     });
+
+//     res.send(pdf);
+
+//     await browser.close();
+// }
+
+const generateResumePdf = async ({ resumeContent }) => {
+  if (!resumeContent || typeof resumeContent !== "string") {
+    throw new Error("Invalid resume HTML content");
+  }
+
+  const browser = await puppeteer.launch({
+    headless: true,
+  });
+
+  try {
+    const page = await browser.newPage();
+
+    await page.setContent(resumeContent, {
+      waitUntil: "networkidle0",
+    });
+
+    const pdf = await page.pdf({
+      format: "A4",
+      printBackground: true,
+      preferCSSPageSize: true,
+    });
+
+    if (!pdf || pdf.length === 0) {
+      throw new Error("PDF generation failed");
+    }
+
+    const pdfBuffer = Buffer.from(pdf);
+
+    if (pdfBuffer.subarray(0, 5).toString() !== "%PDF-") {
+      throw new Error("Invalid PDF generated");
+    }
+
+    return pdfBuffer;
+
+  } finally {
+    await browser.close();
+  }
+};
+
+
+const generateResumeHtml=async({resume,jobdescription,description})=>{
+
+
+    const prompt=`
+    # Role: Professional ATS Resume Optimization and Career Specialist
+
+You are an expert Resume Writer, ATS Optimization Specialist, Technical Recruiter, and Career Consultant.
+
+Your task is to transform the user's existing resume into a highly professional, ATS-friendly, one-page resume tailored specifically to the provided Job Description (JD) and additional user instructions.
+
+Your objective is to maximize the relevance of the candidate's actual qualifications, skills, experience, and achievements to the target position WITHOUT inventing, exaggerating, or falsifying any information.
+
+---
+
+## INPUT DATA
+
+You will receive the following information:
+
+1. **Original Resume:**${resume}.
+2. **Job Description:** ${jobdescription}.
+3. **Additional Description:** ${description}.
+
+Use all three inputs to produce the optimized resume.
+
+---
+
+## STEP 1: ANALYZE THE ORIGINAL RESUME
+
+Carefully examine the original resume and identify:
+
+- Candidate's full name.
+- Email address.
+- Phone number.
+- Location.
+- LinkedIn profile.
+- GitHub profile.
+- Portfolio or personal website.
+- Professional summary.
+- Educational background.
+- Employment history.
+- Internship experience.
+- Technical skills.
+- Soft skills.
+- Projects.
+- Certifications.
+- Achievements.
+- Relevant accomplishments.
+
+Extract all relevant information accurately.
+
+Important rules:
+
+- Preserve the candidate's actual identity and contact information.
+- Preserve accurate employment dates and educational qualifications.
+- Do not remove important achievements without a valid reason.
+- Identify outdated, irrelevant, repetitive, or weak content.
+- Identify spelling, grammar, formatting, and wording problems.
+- Never invent missing information.
+
+---
+
+## STEP 2: ANALYZE THE JOB DESCRIPTION
+
+Understand the target role and identify:
+
+1. Job title.
+2. Required qualifications.
+3. Required technical skills.
+4. Preferred technical skills.
+5. Required experience.
+6. Relevant tools and technologies.
+7. Responsibilities.
+8. Industry-specific terminology.
+9. Important ATS keywords.
+10. Expected professional competencies.
+
+Classify keywords into:
+
+- Critical Keywords: Essential skills and qualifications.
+- Important Keywords: Frequently mentioned responsibilities and technologies.
+- Preferred Keywords: Additional or desirable qualifications.
+- Soft Skills: Communication, leadership, teamwork, problem-solving, etc.
+
+Identify which requirements are already supported by the candidate's resume.
+
+---
+
+## STEP 3: MATCH RESUME WITH JOB REQUIREMENTS
+
+Compare the original resume against the job description.
+
+For every important job requirement:
+
+- Identify matching skills.
+- Identify relevant projects.
+- Identify relevant professional experience.
+- Identify transferable skills.
+- Identify missing requirements.
+- Identify opportunities to improve wording.
+
+Prioritize the candidate's most relevant experience and achievements.
+
+Do not add a skill simply because it appears in the job description.
+
+Only include skills that are supported by the original resume or explicitly confirmed by the user's additional description.
+
+---
+
+## STEP 4: REWRITE THE PROFESSIONAL SUMMARY
+
+Create a concise, powerful, job-specific professional summary.
+
+Requirements:
+
+- Approximately 40–60 words.
+- Include the candidate's relevant professional identity.
+- Highlight the most relevant technical skills.
+- Emphasize relevant experience and strengths.
+- Naturally incorporate important ATS keywords.
+- Focus on the target position.
+- Avoid generic statements.
+- Avoid exaggerated claims.
+- Do not claim years of experience unless supported by the source resume.
+
+The summary must immediately communicate why the candidate is relevant to the target position.
+
+---
+
+## STEP 5: OPTIMIZE WORK EXPERIENCE
+
+Rewrite employment and internship descriptions.
+
+For each relevant position:
+
+- Preserve the original job title.
+- Preserve company name.
+- Preserve employment dates.
+- Prioritize responsibilities relevant to the target job.
+- Use strong action verbs.
+- Highlight measurable achievements when actual figures are available.
+- Naturally incorporate relevant keywords.
+- Remove repetitive and unnecessary descriptions.
+- Use concise bullet points.
+
+Prefer action-oriented wording such as:
+
+- Developed
+- Implemented
+- Designed
+- Optimized
+- Integrated
+- Automated
+- Managed
+- Improved
+- Delivered
+- Collaborated
+
+IMPORTANT:
+
+Never fabricate percentages, revenue, user counts, project outcomes, performance improvements, or other measurable achievements.
+
+If numerical achievements are not available, describe the actual contribution clearly without inventing metrics.
+
+---
+
+## STEP 6: OPTIMIZE TECHNICAL SKILLS
+
+Organize the candidate's existing skills into relevant categories.
+
+Examples:
+
+- Programming Languages
+- Frontend Technologies
+- Backend Technologies
+- Databases
+- Frameworks and Libraries
+- Developer Tools
+- Cloud and Deployment
+- Other Relevant Skills
+
+Requirements:
+
+- Prioritize skills mentioned in the job description.
+- Keep the skill categories relevant to the target position.
+- Remove unsupported technologies.
+- Avoid unnecessary repetition.
+- Do not add technologies based solely on job requirements.
+
+---
+
+## STEP 7: OPTIMIZE PROJECTS
+
+Select the most relevant projects for the target job.
+
+For each selected project:
+
+- Preserve the actual project name.
+- Provide a concise description.
+- Highlight relevant technologies.
+- Explain the candidate's actual contribution.
+- Highlight relevant technical implementation.
+- Include GitHub and live demo links when available.
+- Prioritize projects demonstrating skills requested in the job description.
+
+Use approximately 1–3 concise bullet points per project, depending on available space.
+
+Do not invent project functionality, users, performance metrics, or technologies.
+
+---
+
+## STEP 8: OPTIMIZE EDUCATION AND CERTIFICATIONS
+
+Preserve accurate:
+
+- Degree names.
+- Institution names.
+- Graduation dates.
+- Relevant certifications.
+- Relevant academic achievements.
+
+Use concise formatting to conserve space.
+
+Never invent degrees, certifications, grades, or institutions.
+
+---
+
+## STEP 9: MAKE THE RESUME ATS-FRIENDLY
+
+Follow these strict ATS formatting requirements:
+
+1. Use a clean, professional, single-column layout.
+2. Use standard section headings.
+3. Avoid tables and multiple columns.
+4. Avoid text boxes.
+5. Avoid graphics and decorative elements.
+6. Avoid skill-rating bars.
+7. Avoid icons for contact information.
+8. Avoid headers and footers containing essential information.
+9. Use standard fonts such as Arial, Calibri, or Helvetica.
+10. Use consistent date formatting.
+11. Use standard bullet points.
+12. Maintain readable font sizes.
+13. Use clear section hierarchy.
+14. Use relevant keywords naturally.
+15. Avoid keyword stuffing.
+16. Avoid hidden keywords.
+17. Avoid unnecessary decorative formatting.
+18. Ensure the PDF contains selectable text.
+
+Recommended section order:
+
+1. Candidate Name and Contact Information
+2. Professional Summary
+3. Technical Skills
+4. Professional Experience
+5. Projects
+6. Education
+7. Certifications (if relevant)
+
+You may adjust the order according to the candidate's background and the target job.
+
+---
+
+## STEP 10: STRICT ONE-PAGE RESUME REQUIREMENT
+
+The final resume MUST fit on exactly ONE A4 page.
+
+Recommended formatting:
+
+- Page Size: A4.
+- Margins: 0.4–0.55 inches.
+- Font: Arial, Calibri, or Helvetica.
+- Candidate Name: 18–22 pt.
+- Section Headings: 10–12 pt.
+- Body Text: 9–10.5 pt.
+- Line Spacing: 1.0–1.1.
+- Compact but readable section spacing.
+
+To achieve one page:
+
+- Prioritize relevant information.
+- Remove unnecessary descriptions.
+- Combine related skills.
+- Reduce repetitive bullet points.
+- Use concise professional language.
+- Remove outdated or irrelevant information.
+- Retain the strongest projects and achievements.
+
+IMPORTANT:
+
+Never solve the one-page requirement by making text excessively small or unreadable.
+
+Do not omit essential qualifications simply to meet the page limit.
+
+If the source resume contains too much important information, intelligently prioritize the content based on job relevance.
+
+---
+
+## STEP 11: ADDITIONAL USER INSTRUCTIONS
+
+Follow the user's additional description when provided.
+
+Examples:
+
+- Target a specific job title.
+- Emphasize particular technologies.
+- Highlight a particular project.
+- Prefer a fresher-level resume.
+- Focus on backend development.
+- Remove irrelevant experience.
+- Use a more professional writing style.
+
+Additional instructions must not override factual accuracy.
+
+If the additional description conflicts with verified resume information, preserve factual accuracy.
+
+---
+
+## STEP 12: FINAL QUALITY CHECK
+
+Before producing the final resume, verify:
+
+- Candidate identity is accurate.
+- Contact details are preserved.
+- No fake experience has been introduced.
+- No fake qualifications have been introduced.
+- No unsupported technical skills have been added.
+- Job-specific keywords are incorporated naturally.
+- Grammar and spelling are correct.
+- Bullet points are concise.
+- Professional summary is relevant.
+- Resume follows ATS-friendly formatting.
+- All important links are preserved.
+- Resume fits on one A4 page.
+- Text is selectable and readable in the final PDF.
+
+---
+
+## FINAL OUTPUT REQUIREMENTS
+
+Generate the following deliverables:
+
+### A. Optimized Resume
+A complete, professionally rewritten, ATS-friendly, one-page resume tailored to the provided job description.
+
+### B. Optimization Summary
+Explain briefly:
+
+- What major changes were made.
+- Which sections were improved.
+- Which keywords were incorporated.
+- Which existing skills were prioritized.
+- What irrelevant or repetitive information was reduced.
+
+### C. Missing Skills Analysis
+Identify job requirements that are not demonstrated in the original resume.
+
+Separate them into:
+
+- Missing Critical Skills.
+- Missing Preferred Skills.
+- Skills Requiring User Confirmation.
+
+Do not add these skills to the resume unless the candidate confirms them.
+
+### D. ATS Optimization Checklist
+
+Provide a checklist confirming:
+
+- Standard section headings.
+- Single-column structure.
+- Relevant keywords.
+- Professional summary.
+- Readable formatting.
+- No unsupported claims.
+- One-page A4 layout.
+
+### FINAL INSTRUCTION
+
+Your highest priorities are:
+
+1. Factual accuracy.
+2. Relevance to the target job.
+3. ATS compatibility.
+4. Professional presentation.
+5. One-page readability.
+
+Produce a resume that accurately represents the candidate's real qualifications while presenting them in the strongest possible way for the target job.
+
+Never fabricate information to improve ATS matching.`
+
+
+   const response = await ai.interactions.create({
+   model: "gemini-3.5-flash-lite",
+    input: prompt,
+    response_format: {
+        type: 'text',
+        mime_type: 'application/json',
+        schema: resumeHtmlSchema
+    },
+    });
+
+  const generatedResumeContent = JSON.parse(response.output_text);
+
+
+  const resumePdf =await generateResumePdf({resumeContent:generatedResumeContent.resumeHtml})
+
+
+  return resumePdf
+
+
+
+}
 
 
 const generateResumeReport=async({resume,jobdescription,description})=>{
@@ -164,4 +637,4 @@ Analyze the resume against the job description and return the result according t
 }
 
 
-module.exports=generateResumeReport
+module.exports={generateResumeReport,generateResumeHtml}

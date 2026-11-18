@@ -13,6 +13,7 @@ const uploadFile=async(buffer)=>{
       const stream = cloudinary.uploader.upload_stream(
         {
           folder: "jobFit-AI",
+           resource_type: "image",
         },
         (error, result) => {
           if (error) {

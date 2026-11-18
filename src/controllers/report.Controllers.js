@@ -1,9 +1,12 @@
 
 const pdfParse =require('pdf-parse')
+const axios=require('axios')
 const extractImageText=require("../utils/extractTextFromImage")
-const generateResumeReport=require("../services/gemini.service")
+const {generateResumeReport,generateResumeHtml}=require("../services/gemini.service")
 const reportModel=require('../models/report.model')
 const userModel=require('../models/user.model')
+const resumeModel=require("../models/genratedResume.model")
+const {uploadFile}=require("../services/cloudinary.service")
 
 exports.generateReport=async(req,res)=>{
 
@@ -33,15 +36,31 @@ exports.generateReport=async(req,res)=>{
     }
 
     const resumeReportWithAi=await generateResumeReport({
-         resume:resumeContent.text,
+        resume:resumeContent.text,
         jobdescription:jobDescriptionContent,
         description
     })
 
+    if(!resumeReportWithAi){
+        return res.status(500).json({
+            message:"Report generation failed from AI service"
+        })
+    }
+
+
+   const UploadResumeToCloudinary=await uploadFile(resume.buffer)
+
+   if(!UploadResumeToCloudinary || !UploadResumeToCloudinary.secure_url){
+     return res.status(500).json({
+        message:"Resume upload to cloudinary failed"
+     })
+   }
+
     const report = await reportModel.create({
         user:req.user._id,
-        resume:resumeContent.text,
+        resume:UploadResumeToCloudinary.secure_url,
         jobDescription:jobDescriptionContent,
+        publicId: UploadResumeToCloudinary.public_id,
         description,
         ...resumeReportWithAi
     })
@@ -225,3 +244,197 @@ exports.reportHistorySearchController=async(req,res)=>{
         },
     });
 };
+
+exports.generateResumePdfController=async(req,res)=>{
+
+    const {reportId}=req.params ;
+    
+    const Report=await reportModel.findById(reportId)
+
+    if(!Report){
+
+    return res.status(400).json({
+        message:"invalid ReportID"
+    })
+
+    }
+
+    const alreadyGeneratedResume=await resumeModel.findOne({ report: reportId })
+
+    if(alreadyGeneratedResume && alreadyGeneratedResume?.status !== "failed"){
+
+        return res.status(200).json({
+            message:"Resume already generated for this report",
+            generatedResume:alreadyGeneratedResume
+        })
+
+    }
+
+
+   const {jobDescription,description,resume}=Report
+
+    const response = await axios.get(resume, {
+        responseType: "arraybuffer"
+    });
+
+// Convert to Buffer
+const pdfBuffer = Buffer.from(response.data);
+
+// const resumeContent=await (new pdfParse.PDFParse(Uint8Array.from(pdfBuffer))).getText()
+
+const resumeContent =await (new pdfParse.PDFParse({
+    data: new Uint8Array(pdfBuffer)
+})).getText();
+
+    const pdf =await generateResumeHtml({ 
+        resume:resumeContent.text,
+        jobdescription:jobDescription,
+        description
+    })
+
+ 
+    if(!pdf || pdf.length === 0){
+        await resumeModel.create({
+        report:reportId,
+        originalResume:resume,
+        status:"failed",
+    })
+
+    return res.status(500).json({
+        message:"resume generation failed",
+        originalResume:resume
+    })
+
+    }
+
+    const uploadingToCloudinary=await uploadFile(pdf)
+
+    if(!uploadingToCloudinary || !uploadingToCloudinary.secure_url){
+        await resumeModel.create({
+        report:reportId,
+        originalResume:resume,
+        status:"failed"
+        })
+
+        return res.status(500).json({
+            message:"resume generation failed"
+        })
+    }
+  
+    const generatedResume = await resumeModel.create({
+        report:reportId,
+        resume:uploadingToCloudinary.secure_url,
+        originalResume:resume,
+        publicId: uploadingToCloudinary.public_id,
+    })
+
+    res.status(201).json({
+        message:"Resume Generated Successfully",
+        generatedResume
+    })
+
+}
+
+// exports.generateResumePdfController = async (req, res) => {
+
+//     let generatedResume;
+//     let parser;
+
+//     try {
+
+//         const { reportId } = req.params;
+
+//         const Report = await reportModel.findById(reportId);
+
+//         if (!Report) {
+//             return res.status(404).json({
+//                 message: "Invalid Report ID"
+//             });
+//         }
+
+//         generatedResume = await resumeModel.findOne({
+//             report: reportId
+//         });
+
+//         if (generatedResume && generatedResume.status !== "failed") {
+//             return res.status(200).json({
+//                 message: "Resume already generated for this report",
+//                 generatedResume
+//             });
+//         }
+
+//         const { jobDescription, description, resume } = Report;
+
+//         if (generatedResume) {
+
+
+//         const response = await axios.get(resume, {
+//             responseType: "arraybuffer",
+//             timeout: 30000
+//         });
+
+//         const pdfBuffer = Buffer.from(response.data);
+
+//         parser = new PDFParse({
+//             data: new Uint8Array(pdfBuffer)
+//         });
+
+//         const result = await parser.getText();
+
+//         const resumeContent = result.text;
+
+//         if (!resumeContent || !resumeContent.trim()) {
+//             throw new Error("Unable to extract text from original PDF");
+//         }
+
+//         const pdf = await generateResumeHtml({
+//             resume: resumeContent,
+//             jobdescription: jobDescription,
+//             description
+//         });
+
+//         if (!pdf || pdf.length === 0) {
+//             throw new Error("Resume PDF generation failed");
+//         }
+
+//         const uploadingToCloudinary = await uploadFile(pdf);
+
+//         if (!uploadingToCloudinary?.secure_url) {
+//             throw new Error("Cloudinary upload failed");
+//         }
+
+//         generatedResume.resume = uploadingToCloudinary.secure_url;
+//         generatedResume.status = "completed";
+
+//         await generatedResume.save();
+
+//         return res.status(201).json({
+//             message: "Resume Generated Successfully",
+//             generatedResume
+//         });
+
+//     }
+// } catch (error) {
+
+//         console.error("Resume generation error:", error);
+
+//         if (generatedResume) {
+//             generatedResume.status = "failed";
+//             await generatedResume.save().catch(console.error);
+//         }
+
+//         return res.status(500).json({
+//             message: "Resume generation failed",
+//             error: error.message
+//         });
+
+//     } finally {
+
+//         if (parser) {
+//             await parser.destroy().catch(console.error);
+//         }
+
+//     }
+
+// };
+

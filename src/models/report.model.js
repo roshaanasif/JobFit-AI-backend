@@ -67,6 +67,10 @@ const reportSchema=new mongoose.Schema({
         type:String,
         required:[true,"Resume Is Required For Matching"]
     },
+     publicId:{
+      type: String,
+      required:true
+    },
     matchScore:{
         type:Number,
         min:0,

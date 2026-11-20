@@ -23,6 +23,7 @@ The API is built with Express and MongoDB, and uses Google Gemini for analysis a
 - JWT authentication
 - Cloudinary (profile image uploads)
 - Google Gemini API (resume analysis)
+- Puppeteer (generated resume PDF rendering)
 - Multer (file uploads)
 - PDF parsing and OCR support
 - CORS and cookie parsing
@@ -50,6 +51,7 @@ The API is built with Express and MongoDB, and uses Google Gemini for analysis a
 - upload or provide job description text
 - extract text from uploaded job description images if needed
 - generate a structured AI report
+- generate an ATS-friendly, job-targeted resume PDF from a report
 
 ### AI-generated report output
 
@@ -96,6 +98,7 @@ backend/
 │   │   └── file.middleware.js
 │   ├── models/
 │   │   ├── report.model.js
+│   │   ├── genratedResume.model.js
 │   │   ├── tokenblacklisting.model.js
 │   │   └── user.model.js
 │   ├── routes/
@@ -142,7 +145,7 @@ Notes:
 - `MONGODB_URI` is required for database connection.
 - `JWT_SECRET` and `JWT_REFRESH_SECRET` must be strong random strings.
 - `GEMINI_API_KEY` powers the AI resume match analysis.
-- Cloudinary credentials are used for profile-picture uploads.
+- Cloudinary credentials are used for profile-picture uploads, original resumes, and generated resume PDFs.
 
 ## Installation
 
@@ -283,6 +286,31 @@ curl -X POST http://localhost:5000/api/report \
   -F "jobDescription=@job-description.txt"
 ```
 
+#### Generate an optimized resume PDF for a report
+
+```http
+POST /api/report/resume/pdf/:reportId
+```
+
+Requires authentication and an existing report ID. No request body is required. The backend retrieves the original resume and job details from the report, generates a tailored ATS-friendly resume PDF, and uploads it to Cloudinary.
+
+On success, the response includes a `generatedResume` object with the generated PDF URL in its `resume` field:
+
+```json
+{
+  "message": "Resume Generated Successfully",
+  "generatedResume": {
+    "report": "REPORT_ID",
+    "resume": "https://res.cloudinary.com/...",
+    "originalResume": "https://res.cloudinary.com/...",
+    "publicId": "jobFit-AI/GENERATED_RESUME_ID",
+    "status": "generated"
+  }
+}
+```
+
+If a resume has already been generated successfully for the report, the existing result is returned instead of generating another PDF.
+
 #### Get single report by ID
 
 ```http
@@ -377,6 +405,10 @@ Fields include:
 - `preparationPlan`
 - `technicalQuestions`
 - timestamps
+
+### Generated resume model
+
+Generated resume records are linked to a report and include the generated PDF URL (`resume`), original resume URL (`originalResume`), Cloudinary public ID, generation status (`generated` or `failed`), and timestamps.
 
 ### Token blacklist model
 
